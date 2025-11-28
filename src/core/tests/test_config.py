@@ -21,9 +21,7 @@ class TestServerConfig:
         """Test custom configuration values."""
         gemini_opts = GeminiOptions(model="gemini-pro")
         config = ServerConfig(
-            name="Custom Server",
-            gemini_options=gemini_opts,
-            enable_caching=False
+            name="Custom Server", gemini_options=gemini_opts, enable_caching=False
         )
         assert config.name == "Custom Server"
         assert config.gemini_options.model == "gemini-pro"
@@ -40,7 +38,7 @@ class TestPromptTemplate:
             description="Test template",
             system_prompt="System instructions",
             user_template="User prompt with {variable}",
-            variables={"variable": "Test variable"}
+            variables={"variable": "Test variable"},
         )
         assert template.name == "test_template"
         assert template.description == "Test template"
@@ -52,7 +50,7 @@ class TestPromptTemplate:
             description="Test",
             system_prompt="System instructions",
             user_template="User: {request}",
-            variables={"request": "Test request"}
+            variables={"request": "Test request"},
         )
 
         # Note: format() only formats user_template, system_prompt is returned as-is
@@ -117,7 +115,7 @@ class TestConfigManager:
             description="Custom test template",
             system_prompt="Custom system",
             user_template="Custom user {var}",
-            variables={"var": "variable"}
+            variables={"var": "variable"},
         )
 
         manager.add_template(custom_template)
@@ -161,7 +159,7 @@ class TestConfigManager:
         system, user = template.format(
             language="python",
             code="def hello(): pass",
-            focus_instruction="Focus on style"
+            focus_instruction="Focus on style",
         )
 
         assert "code reviewer" in system.lower()
@@ -177,7 +175,7 @@ class TestConfigManager:
         system, user = template.format(
             feature_plan="Add user login",
             context="Web application",
-            focus_areas="security,usability"
+            focus_areas="security,usability",
         )
 
         assert "architect" in system.lower() or "product manager" in system.lower()

@@ -15,20 +15,18 @@ def main():
 
     # Run pytest with our configuration
     cmd = [
-        sys.executable, "-m", "pytest",
+        sys.executable,
+        "-m",
+        "pytest",
         str(project_root / "src"),
         "-v",
         "--tb=short",
-        "--color=yes"
+        "--color=yes",
     ]
 
     # Add coverage if requested
     if "--coverage" in sys.argv:
-        cmd.extend([
-            "--cov=src",
-            "--cov-report=term-missing",
-            "--cov-report=html"
-        ])
+        cmd.extend(["--cov=src", "--cov-report=term-missing", "--cov-report=html"])
 
     print(f"Running: {' '.join(cmd)}")
     result = subprocess.run(cmd, cwd=project_root)

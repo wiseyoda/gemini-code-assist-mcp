@@ -6,7 +6,6 @@ This server provides integration with Google Gemini CLI for AI-powered
 development assistance through the Model Context Protocol.
 """
 
-import asyncio
 import sys
 from pathlib import Path
 
@@ -19,13 +18,13 @@ from src.server.gemini_server import create_server
 # The MCP install command looks for objects named 'mcp', 'app', or 'server'
 mcp = create_server()
 server = mcp  # Alias for compatibility
-app = mcp     # Alias for compatibility
+app = mcp  # Alias for compatibility
 
 
 def main() -> None:
     """
     Main entry point for the Gemini MCP Server.
-    
+
     Starts the FastMCP server with stdio transport.
     """
     try:

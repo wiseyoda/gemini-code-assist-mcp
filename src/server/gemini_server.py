@@ -47,7 +47,9 @@ class GeminiToolResponse(BaseModel):
     result: str = Field(description="The processed result")
     input_prompt: str = Field(description="The prompt sent to Gemini")
     gemini_response: str = Field(description="The raw response from Gemini")
-    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+    metadata: dict[str, Any] = Field(
+        default_factory=dict, description="Additional metadata"
+    )
 
 
 def _normalize_issue(item: dict[str, Any] | str) -> CodeIssue:
@@ -65,7 +67,7 @@ def _normalize_issue(item: dict[str, Any] | str) -> CodeIssue:
     return CodeIssue(
         line=item.get("line"),
         severity=item.get("severity"),
-        message=item.get("message", item.get("issue", str(item)))
+        message=item.get("message", item.get("issue", str(item))),
     )
 
 
@@ -83,14 +85,14 @@ def _normalize_suggestion(item: dict[str, Any] | str) -> CodeSuggestion:
         return CodeSuggestion(suggestion=item)
     return CodeSuggestion(
         line=item.get("line"),
-        suggestion=item.get("suggestion", item.get("text", str(item)))
+        suggestion=item.get("suggestion", item.get("text", str(item))),
     )
 
 
 def create_server() -> FastMCP:
     """
     Create and configure the Gemini MCP server.
-    
+
     Returns:
         Configured FastMCP server instance
     """
@@ -102,7 +104,7 @@ def create_server() -> FastMCP:
     mcp = FastMCP(
         name=server_config.name,
         # Enable stateless HTTP for Claude Code compatibility
-        stateless_http=True
+        stateless_http=True,
     )
 
     # Initialize Gemini client
@@ -117,7 +119,7 @@ def create_server() -> FastMCP:
     ) -> CodeReviewResponse:
         """
         Analyze code quality, style, and potential issues using Gemini.
-        
+
         Args:
             code: Code to review
             language: Programming language
@@ -140,21 +142,18 @@ def create_server() -> FastMCP:
                 "performance": "Focus on performance optimizations and bottlenecks.",
                 "style": "Focus on code style, formatting, and best practices.",
                 "bugs": "Focus on potential bugs and logical errors.",
-                "general": "Provide a comprehensive review covering all aspects."
+                "general": "Provide a comprehensive review covering all aspects.",
             }
             focus_instruction = focus_map.get(focus, focus_map["general"])
 
             # Format template
             system_prompt, user_prompt = template.format(
-                language=lang,
-                code=code,
-                focus_instruction=focus_instruction
+                language=lang, code=code, focus_instruction=focus_instruction
             )
 
             # Call Gemini
             response = await gemini_client.call_with_structured_prompt(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt
+                system_prompt=system_prompt, user_prompt=user_prompt
             )
 
             if not response.success:
@@ -177,9 +176,11 @@ def create_server() -> FastMCP:
                 else:
                     # Create structured response from text
                     parsed = {
-                        "summary": content[:500] + "..." if len(content) > 500 else content,
+                        "summary": content[:500] + "..."
+                        if len(content) > 500
+                        else content,
                         "issues": [],
-                        "suggestions": content.split('\n') if content else []
+                        "suggestions": content.split("\n") if content else [],
                     }
 
                 # Normalize issues and suggestions to proper models
@@ -187,7 +188,9 @@ def create_server() -> FastMCP:
                 raw_suggestions = parsed.get("suggestions", [])
 
                 normalized_issues = [_normalize_issue(i) for i in raw_issues]
-                normalized_suggestions = [_normalize_suggestion(s) for s in raw_suggestions if s]
+                normalized_suggestions = [
+                    _normalize_suggestion(s) for s in raw_suggestions if s
+                ]
 
                 return CodeReviewResponse(
                     summary=parsed.get("summary", "Code review completed"),
@@ -195,18 +198,20 @@ def create_server() -> FastMCP:
                     suggestions=normalized_suggestions,
                     rating=parsed.get("rating", "Review completed"),
                     input_prompt=response.input_prompt,
-                    gemini_response=response.content
+                    gemini_response=response.content,
                 )
 
             except json.JSONDecodeError:
                 # Fallback to simple text response
                 return CodeReviewResponse(
-                    summary=response.content[:200] + "..." if len(response.content) > 200 else response.content,
+                    summary=response.content[:200] + "..."
+                    if len(response.content) > 200
+                    else response.content,
                     issues=[],
                     suggestions=[CodeSuggestion(suggestion=response.content)],
                     rating="Review completed (text format)",
                     input_prompt=response.input_prompt,
-                    gemini_response=response.content
+                    gemini_response=response.content,
                 )
 
         except Exception as e:
@@ -217,7 +222,7 @@ def create_server() -> FastMCP:
                 suggestions=[],
                 rating="Failed",
                 input_prompt="Error occurred before prompt creation",
-                gemini_response=f"Error: {str(e)}"
+                gemini_response=f"Error: {str(e)}",
             )
 
     @mcp.tool()
@@ -229,7 +234,7 @@ def create_server() -> FastMCP:
     ) -> GeminiToolResponse:
         """
         Review and improve feature plans and specifications using Gemini.
-        
+
         Args:
             feature_plan: Feature plan document
             context: Project context
@@ -245,15 +250,12 @@ def create_server() -> FastMCP:
 
             # Format template
             system_prompt, user_prompt = template.format(
-                feature_plan=feature_plan,
-                context=context,
-                focus_areas=focus_areas
+                feature_plan=feature_plan, context=context, focus_areas=focus_areas
             )
 
             # Call Gemini
             response = await gemini_client.call_with_structured_prompt(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt
+                system_prompt=system_prompt, user_prompt=user_prompt
             )
 
             if not response.success:
@@ -262,7 +264,7 @@ def create_server() -> FastMCP:
             return GeminiToolResponse(
                 result=response.content,
                 input_prompt=response.input_prompt,
-                gemini_response=response.content
+                gemini_response=response.content,
             )
 
         except Exception as e:
@@ -270,7 +272,7 @@ def create_server() -> FastMCP:
             return GeminiToolResponse(
                 result=f"Error during feature plan review: {str(e)}",
                 input_prompt="Error occurred before prompt creation",
-                gemini_response=f"Error: {str(e)}"
+                gemini_response=f"Error: {str(e)}",
             )
 
     @mcp.tool()
@@ -285,7 +287,7 @@ def create_server() -> FastMCP:
     ) -> GeminiToolResponse:
         """
         Analyze bugs and suggest fixes using Gemini.
-        
+
         Args:
             bug_description: Description of the bug
             code_context: Relevant code snippets
@@ -309,13 +311,12 @@ def create_server() -> FastMCP:
                 code_context=code_context,
                 language=language or "unknown",
                 environment=environment,
-                reproduction_steps=reproduction_steps
+                reproduction_steps=reproduction_steps,
             )
 
             # Call Gemini
             response = await gemini_client.call_with_structured_prompt(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt
+                system_prompt=system_prompt, user_prompt=user_prompt
             )
 
             if not response.success:
@@ -324,7 +325,7 @@ def create_server() -> FastMCP:
             return GeminiToolResponse(
                 result=response.content,
                 input_prompt=response.input_prompt,
-                gemini_response=response.content
+                gemini_response=response.content,
             )
 
         except Exception as e:
@@ -332,7 +333,7 @@ def create_server() -> FastMCP:
             return GeminiToolResponse(
                 result=f"Error during bug analysis: {str(e)}",
                 input_prompt="Error occurred before prompt creation",
-                gemini_response=f"Error: {str(e)}"
+                gemini_response=f"Error: {str(e)}",
             )
 
     @mcp.tool()
@@ -345,7 +346,7 @@ def create_server() -> FastMCP:
     ) -> GeminiToolResponse:
         """
         Explain code functionality and implementation using Gemini.
-        
+
         Args:
             code: Code to explain
             language: Programming language
@@ -365,16 +366,12 @@ def create_server() -> FastMCP:
 
             # Format template
             system_prompt, user_prompt = template.format(
-                language=lang,
-                code=code,
-                detail_level=detail_level,
-                questions=questions
+                language=lang, code=code, detail_level=detail_level, questions=questions
             )
 
             # Call Gemini
             response = await gemini_client.call_with_structured_prompt(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt
+                system_prompt=system_prompt, user_prompt=user_prompt
             )
 
             if not response.success:
@@ -383,7 +380,7 @@ def create_server() -> FastMCP:
             return GeminiToolResponse(
                 result=response.content,
                 input_prompt=response.input_prompt,
-                gemini_response=response.content
+                gemini_response=response.content,
             )
 
         except Exception as e:
@@ -391,7 +388,7 @@ def create_server() -> FastMCP:
             return GeminiToolResponse(
                 result=f"Error during code explanation: {str(e)}",
                 input_prompt="Error occurred before prompt creation",
-                gemini_response=f"Error: {str(e)}"
+                gemini_response=f"Error: {str(e)}",
             )
 
     # Add resources for configuration and status
@@ -416,14 +413,10 @@ def create_server() -> FastMCP:
             status = {
                 "authenticated": auth_valid,
                 "model": config_manager.config.gemini_options.model,
-                "cli_available": True
+                "cli_available": True,
             }
         except Exception as e:
-            status = {
-                "authenticated": False,
-                "error": str(e),
-                "cli_available": False
-            }
+            status = {"authenticated": False, "error": str(e), "cli_available": False}
 
         return json.dumps(status, indent=2)
 

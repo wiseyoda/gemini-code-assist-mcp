@@ -56,7 +56,7 @@ class TestResponseModels:
             suggestions=[CodeSuggestion(suggestion="Add tests")],
             rating="B+",
             input_prompt="Review this code",
-            gemini_response="Good code overall"
+            gemini_response="Good code overall",
         )
         assert response.summary == "Good code"
         assert len(response.issues) == 1
@@ -68,7 +68,7 @@ class TestResponseModels:
         response = GeminiToolResponse(
             result="Analysis complete",
             input_prompt="Analyze this",
-            gemini_response="The analysis shows..."
+            gemini_response="The analysis shows...",
         )
         assert response.result == "Analysis complete"
         assert response.metadata == {}
@@ -86,21 +86,16 @@ class TestNormalizationFunctions:
 
     def test_normalize_issue_from_dict(self):
         """Test normalizing issue from dict."""
-        issue = _normalize_issue({
-            "line": 42,
-            "severity": "high",
-            "message": "SQL injection risk"
-        })
+        issue = _normalize_issue(
+            {"line": 42, "severity": "high", "message": "SQL injection risk"}
+        )
         assert issue.line == 42
         assert issue.severity == "high"
         assert issue.message == "SQL injection risk"
 
     def test_normalize_issue_from_dict_with_issue_key(self):
         """Test normalizing issue when dict uses 'issue' key instead of 'message'."""
-        issue = _normalize_issue({
-            "line": 10,
-            "issue": "Missing validation"
-        })
+        issue = _normalize_issue({"line": 10, "issue": "Missing validation"})
         assert issue.line == 10
         assert issue.message == "Missing validation"
 
@@ -112,19 +107,17 @@ class TestNormalizationFunctions:
 
     def test_normalize_suggestion_from_dict(self):
         """Test normalizing suggestion from dict."""
-        suggestion = _normalize_suggestion({
-            "line": 5,
-            "suggestion": "Use encodeURIComponent"
-        })
+        suggestion = _normalize_suggestion(
+            {"line": 5, "suggestion": "Use encodeURIComponent"}
+        )
         assert suggestion.line == 5
         assert suggestion.suggestion == "Use encodeURIComponent"
 
     def test_normalize_suggestion_from_dict_with_text_key(self):
         """Test normalizing suggestion when dict uses 'text' key."""
-        suggestion = _normalize_suggestion({
-            "line": 3,
-            "text": "Check response.ok before parsing"
-        })
+        suggestion = _normalize_suggestion(
+            {"line": 3, "text": "Check response.ok before parsing"}
+        )
         assert suggestion.line == 3
         assert suggestion.suggestion == "Check response.ok before parsing"
 
@@ -138,8 +131,8 @@ class TestServerCreation:
         assert server is not None
         assert server.name == "Gemini MCP Server"
 
-    @patch('src.server.gemini_server.GeminiCLIClient')
-    @patch('src.server.gemini_server.ConfigManager')
+    @patch("src.server.gemini_server.GeminiCLIClient")
+    @patch("src.server.gemini_server.ConfigManager")
     def test_server_components_initialized(self, mock_config_manager, mock_client):
         """Test that server components are properly initialized."""
         mock_config_instance = Mock()
@@ -150,7 +143,7 @@ class TestServerCreation:
         mock_client_instance = Mock()
         mock_client.return_value = mock_client_instance
 
-        server = create_server()
+        create_server()
 
         mock_config_manager.assert_called_once()
         mock_client.assert_called_once()
@@ -181,11 +174,11 @@ class TestServerTools:
         mock_response = GeminiResponse(
             content='```json\n{"summary": "Good code", "issues": [{"line": 10, "message": "Missing validation"}], "suggestions": [{"line": 2, "suggestion": "Use encodeURIComponent"}], "rating": "B+"}\n```',
             success=True,
-            input_prompt="Review this code"
+            input_prompt="Review this code",
         )
         mock_gemini_client.call_with_structured_prompt.return_value = mock_response
 
-        with patch('src.server.gemini_server.GeminiCLIClient') as mock_client_class:
+        with patch("src.server.gemini_server.GeminiCLIClient") as mock_client_class:
             mock_client_class.return_value = mock_gemini_client
 
             server = create_server()
@@ -199,7 +192,7 @@ class TestServerTools:
                 code="def hello(): return 'world'",
                 ctx=mock_context,
                 language="python",
-                focus="general"
+                focus="general",
             )
 
             assert isinstance(result, CodeReviewResponse)
@@ -221,11 +214,11 @@ class TestServerTools:
         mock_response = GeminiResponse(
             content='```json\n{"summary": "Good code", "issues": [], "suggestions": ["Add docstring", "Add type hints"], "rating": "B+"}\n```',
             success=True,
-            input_prompt="Review this code"
+            input_prompt="Review this code",
         )
         mock_gemini_client.call_with_structured_prompt.return_value = mock_response
 
-        with patch('src.server.gemini_server.GeminiCLIClient') as mock_client_class:
+        with patch("src.server.gemini_server.GeminiCLIClient") as mock_client_class:
             mock_client_class.return_value = mock_gemini_client
 
             server = create_server()
@@ -233,8 +226,7 @@ class TestServerTools:
             tool_func = tool.fn
 
             result = await tool_func(
-                code="def hello(): return 'world'",
-                ctx=mock_context
+                code="def hello(): return 'world'", ctx=mock_context
             )
 
             assert isinstance(result, CodeReviewResponse)
@@ -249,11 +241,11 @@ class TestServerTools:
             content="",
             success=False,
             error="API error",
-            input_prompt="Review this code"
+            input_prompt="Review this code",
         )
         mock_gemini_client.call_with_structured_prompt.return_value = mock_response
 
-        with patch('src.server.gemini_server.GeminiCLIClient') as mock_client_class:
+        with patch("src.server.gemini_server.GeminiCLIClient") as mock_client_class:
             mock_client_class.return_value = mock_gemini_client
 
             server = create_server()
@@ -264,7 +256,9 @@ class TestServerTools:
             result = await tool_func(code="test code", ctx=mock_context)
 
             assert isinstance(result, CodeReviewResponse)
-            assert "error" in result.summary.lower() or "failed" in result.summary.lower()
+            assert (
+                "error" in result.summary.lower() or "failed" in result.summary.lower()
+            )
             assert result.rating == "Failed"
             mock_context.error.assert_called()
 
@@ -274,11 +268,11 @@ class TestServerTools:
         mock_response = GeminiResponse(
             content="The feature plan looks good but needs more details on...",
             success=True,
-            input_prompt="Review this plan"
+            input_prompt="Review this plan",
         )
         mock_gemini_client.call_with_structured_prompt.return_value = mock_response
 
-        with patch('src.server.gemini_server.GeminiCLIClient') as mock_client_class:
+        with patch("src.server.gemini_server.GeminiCLIClient") as mock_client_class:
             mock_client_class.return_value = mock_gemini_client
 
             server = create_server()
@@ -287,8 +281,7 @@ class TestServerTools:
             tool_func = tool.fn
 
             result = await tool_func(
-                feature_plan="Add user authentication system",
-                ctx=mock_context
+                feature_plan="Add user authentication system", ctx=mock_context
             )
 
             assert isinstance(result, GeminiToolResponse)
@@ -301,11 +294,11 @@ class TestServerTools:
         mock_response = GeminiResponse(
             content="The bug is caused by a null pointer exception. To fix...",
             success=True,
-            input_prompt="Analyze this bug"
+            input_prompt="Analyze this bug",
         )
         mock_gemini_client.call_with_structured_prompt.return_value = mock_response
 
-        with patch('src.server.gemini_server.GeminiCLIClient') as mock_client_class:
+        with patch("src.server.gemini_server.GeminiCLIClient") as mock_client_class:
             mock_client_class.return_value = mock_gemini_client
 
             server = create_server()
@@ -316,7 +309,7 @@ class TestServerTools:
             result = await tool_func(
                 bug_description="App crashes on startup",
                 ctx=mock_context,
-                error_logs="NullPointerException at line 42"
+                error_logs="NullPointerException at line 42",
             )
 
             assert isinstance(result, GeminiToolResponse)
@@ -331,11 +324,11 @@ class TestServerTools:
         mock_response = GeminiResponse(
             content="This code defines a lambda function that squares its input...",
             success=True,
-            input_prompt="Explain this code"
+            input_prompt="Explain this code",
         )
         mock_gemini_client.call_with_structured_prompt.return_value = mock_response
 
-        with patch('src.server.gemini_server.GeminiCLIClient') as mock_client_class:
+        with patch("src.server.gemini_server.GeminiCLIClient") as mock_client_class:
             mock_client_class.return_value = mock_gemini_client
 
             server = create_server()
@@ -344,9 +337,7 @@ class TestServerTools:
             tool_func = tool.fn
 
             result = await tool_func(
-                code="lambda x: x**2",
-                ctx=mock_context,
-                language="python"
+                code="lambda x: x**2", ctx=mock_context, language="python"
             )
 
             assert isinstance(result, GeminiToolResponse)

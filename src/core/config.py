@@ -19,23 +19,28 @@ class ServerConfig(BaseModel):
     version: str = Field(default="0.1.0", description="Server version")
     description: str = Field(
         default="MCP server for Google Gemini CLI integration",
-        description="Server description"
+        description="Server description",
     )
 
     # Gemini CLI settings
     gemini_options: GeminiOptions = Field(
-        default_factory=GeminiOptions,
-        description="Default Gemini CLI options"
+        default_factory=GeminiOptions, description="Default Gemini CLI options"
     )
 
     # Server behavior
     enable_caching: bool = Field(default=True, description="Enable response caching")
     cache_ttl_seconds: int = Field(default=3600, description="Cache TTL in seconds")
-    max_file_size_mb: float = Field(default=10.0, description="Maximum file size to process")
-    max_context_files: int = Field(default=20, description="Maximum files to include in context")
+    max_file_size_mb: float = Field(
+        default=10.0, description="Maximum file size to process"
+    )
+    max_context_files: int = Field(
+        default=20, description="Maximum files to include in context"
+    )
 
     # Template settings
-    templates_dir: Path | None = Field(default=None, description="Custom templates directory")
+    templates_dir: Path | None = Field(
+        default=None, description="Custom templates directory"
+    )
 
     model_config = ConfigDict(extra="forbid")
 
@@ -48,17 +53,16 @@ class PromptTemplate(BaseModel):
     system_prompt: str = Field(description="System-level instructions")
     user_template: str = Field(description="User prompt template with placeholders")
     variables: dict[str, str] = Field(
-        default_factory=dict,
-        description="Template variable descriptions"
+        default_factory=dict, description="Template variable descriptions"
     )
 
     def format(self, **kwargs) -> tuple[str, str]:
         """
         Format the template with provided variables.
-        
+
         Args:
             **kwargs: Variables to substitute in template
-            
+
         Returns:
             Tuple of (system_prompt, formatted_user_prompt)
         """
@@ -72,7 +76,7 @@ class ConfigManager:
     def __init__(self, config: ServerConfig | None = None):
         """
         Initialize configuration manager.
-        
+
         Args:
             config: Server configuration (uses defaults if None)
         """
@@ -104,8 +108,8 @@ class ConfigManager:
             variables={
                 "language": "Programming language",
                 "code": "Code to review",
-                "focus_instruction": "Specific focus areas or instructions"
-            }
+                "focus_instruction": "Specific focus areas or instructions",
+            },
         )
 
         # Feature plan review template
@@ -131,8 +135,8 @@ class ConfigManager:
             variables={
                 "feature_plan": "Feature plan document",
                 "context": "Project context and constraints",
-                "focus_areas": "Specific areas to focus on"
-            }
+                "focus_areas": "Specific areas to focus on",
+            },
         )
 
         # Bug analysis template
@@ -161,8 +165,8 @@ class ConfigManager:
                 "code_context": "Relevant code snippets",
                 "language": "Programming language",
                 "environment": "Environment details",
-                "reproduction_steps": "Steps to reproduce the issue"
-            }
+                "reproduction_steps": "Steps to reproduce the issue",
+            },
         )
 
         # Code explanation template
@@ -189,17 +193,17 @@ class ConfigManager:
                 "language": "Programming language",
                 "code": "Code to explain",
                 "detail_level": "Level of detail (basic, intermediate, advanced)",
-                "questions": "Specific questions about the code"
-            }
+                "questions": "Specific questions about the code",
+            },
         )
 
     def get_template(self, name: str) -> PromptTemplate | None:
         """
         Get a template by name.
-        
+
         Args:
             name: Template name
-            
+
         Returns:
             PromptTemplate if found, None otherwise
         """
@@ -208,16 +212,18 @@ class ConfigManager:
     def list_templates(self) -> dict[str, str]:
         """
         List available templates.
-        
+
         Returns:
             Dictionary mapping template names to descriptions
         """
-        return {name: template.description for name, template in self._templates.items()}
+        return {
+            name: template.description for name, template in self._templates.items()
+        }
 
     def add_template(self, template: PromptTemplate) -> None:
         """
         Add a custom template.
-        
+
         Args:
             template: PromptTemplate to add
         """
@@ -226,7 +232,7 @@ class ConfigManager:
     def update_gemini_options(self, **kwargs) -> None:
         """
         Update Gemini CLI options.
-        
+
         Args:
             **kwargs: Options to update
         """
@@ -237,7 +243,7 @@ class ConfigManager:
     def get_config_dict(self) -> dict:
         """
         Get configuration as dictionary.
-        
+
         Returns:
             Configuration dictionary
         """
