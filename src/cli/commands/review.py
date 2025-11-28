@@ -15,7 +15,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 from src.cli.utils.file_utils import read_file_or_stdin, detect_language_from_file, save_output
 from src.core.config import ConfigManager
 from src.core.gemini_client import GeminiCLIClient, GeminiOptions
-from src.server.gemini_server import CodeReviewRequest
 
 
 async def perform_code_review(
@@ -220,7 +219,10 @@ async def file(ctx, file, language, focus, output):
                 save_output(text_output, output)
         
     except Exception as e:
-        formatter.error(f"Code review failed: {str(e)}")
+        if ctx.obj['json']:
+            click.echo(json.dumps({"error": str(e), "success": False}, indent=2))
+        else:
+            formatter.error(f"Code review failed: {str(e)}")
         sys.exit(1)
 
 
@@ -290,7 +292,10 @@ async def stdin(ctx, language, focus, output):
                 save_output(text_output, output)
         
     except Exception as e:
-        formatter.error(f"Code review failed: {str(e)}")
+        if ctx.obj['json']:
+            click.echo(json.dumps({"error": str(e), "success": False}, indent=2))
+        else:
+            formatter.error(f"Code review failed: {str(e)}")
         sys.exit(1)
 
 

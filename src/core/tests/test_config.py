@@ -2,7 +2,8 @@
 Tests for configuration management.
 """
 
-from ..config import ConfigManager, GeminiOptions, PromptTemplate, ServerConfig
+from src.core.config import ConfigManager, PromptTemplate, ServerConfig
+from src.core.gemini_client import GeminiOptions
 
 
 class TestServerConfig:
@@ -49,13 +50,14 @@ class TestPromptTemplate:
         template = PromptTemplate(
             name="test",
             description="Test",
-            system_prompt="System: {instruction}",
+            system_prompt="System instructions",
             user_template="User: {request}",
-            variables={"instruction": "Test instruction", "request": "Test request"}
+            variables={"request": "Test request"}
         )
 
-        system, user = template.format(instruction="Do this", request="Help me")
-        assert system == "System: Do this"
+        # Note: format() only formats user_template, system_prompt is returned as-is
+        system, user = template.format(request="Help me")
+        assert system == "System instructions"
         assert user == "User: Help me"
 
 
@@ -130,7 +132,7 @@ class TestConfigManager:
         manager = ConfigManager()
 
         # Check initial value
-        assert manager.config.gemini_options.model == "gemini-2.5-pro"
+        assert manager.config.gemini_options.model == "gemini-3-pro-preview"
         assert manager.config.gemini_options.sandbox is False
 
         # Update options

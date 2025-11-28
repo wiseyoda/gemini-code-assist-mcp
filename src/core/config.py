@@ -7,7 +7,7 @@ and template management.
 
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .gemini_client import GeminiOptions
 
@@ -37,9 +37,7 @@ class ServerConfig(BaseModel):
     # Template settings
     templates_dir: Path | None = Field(default=None, description="Custom templates directory")
 
-    class Config:
-        """Pydantic config."""
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class PromptTemplate(BaseModel):

@@ -261,7 +261,7 @@ The server can be configured by modifying the `ServerConfig` in `src/core/config
 config = ServerConfig(
     name="Custom Gemini Server",
     gemini_options=GeminiOptions(
-        model="gemini-2.5-pro",  # or "gemini-pro"
+        model="gemini-3-pro-preview",  # or "gemini-2.5-pro"
         sandbox=False,           # Enable sandbox mode
         debug=False             # Enable debug logging
     ),
@@ -381,7 +381,7 @@ uv run gemini-mcp-cli explain file --file algorithm.py --level advanced
 - `--verbose`: Enable verbose output
 - `--debug`: Enable debug mode
 - `--no-color`: Disable colored output
-- `--model`: Specify Gemini model (default: gemini-2.5-pro)
+- `--model`: Specify Gemini model (default: gemini-3-pro-preview)
 - `--sandbox`: Enable sandbox mode
 
 ## Development

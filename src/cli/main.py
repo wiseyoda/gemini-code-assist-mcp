@@ -46,7 +46,7 @@ from src.cli.commands.status import status
 )
 @click.option(
     '--model', '-m',
-    default='gemini-2.5-pro',
+    default='gemini-3-pro-preview',
     help='Gemini model to use'
 )
 @click.option(
@@ -121,7 +121,8 @@ def version(ctx):
     }
     
     if ctx.obj['json']:
-        click.echo(formatter.json.dumps(version_info, indent=2))
+        import json
+        click.echo(json.dumps(version_info, indent=2))
     else:
         formatter.console.print(f"Gemini MCP Server CLI v{version_info['version']}")
         formatter.console.print(f"Python {version_info['python_version']}")

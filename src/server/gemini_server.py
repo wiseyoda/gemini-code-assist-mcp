@@ -15,23 +15,27 @@ from ..core.config import ConfigManager
 from ..core.gemini_client import GeminiCLIClient
 
 
-class CodeReviewRequest(BaseModel):
-    """Request model for code review."""
+class CodeIssue(BaseModel):
+    """Model for a code review issue."""
 
-    code: str = Field(description="Code to review")
-    language: str | None = Field(default=None, description="Programming language")
-    focus: str | None = Field(
-        default="general",
-        description="Focus area: general, security, performance, style, or bugs"
-    )
+    line: int | None = Field(default=None, description="Line number of the issue")
+    severity: str | None = Field(default=None, description="Issue severity")
+    message: str = Field(description="Issue description")
+
+
+class CodeSuggestion(BaseModel):
+    """Model for a code review suggestion."""
+
+    line: int | None = Field(default=None, description="Line number for suggestion")
+    suggestion: str = Field(description="Suggestion text")
 
 
 class CodeReviewResponse(BaseModel):
     """Response model for code review."""
 
     summary: str = Field(description="Overall assessment summary")
-    issues: list[dict[str, Any]] = Field(description="List of identified issues")
-    suggestions: list[str] = Field(description="Improvement suggestions")
+    issues: list[CodeIssue] = Field(description="List of identified issues")
+    suggestions: list[CodeSuggestion] = Field(description="Improvement suggestions")
     rating: str = Field(description="Overall code quality rating")
     input_prompt: str = Field(description="The prompt sent to Gemini")
     gemini_response: str = Field(description="The raw response from Gemini")
@@ -39,45 +43,48 @@ class CodeReviewResponse(BaseModel):
 
 class GeminiToolResponse(BaseModel):
     """Generic response model for Gemini tools with input/output transparency."""
-    
+
     result: str = Field(description="The processed result")
     input_prompt: str = Field(description="The prompt sent to Gemini")
     gemini_response: str = Field(description="The raw response from Gemini")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
 
-class FeaturePlanRequest(BaseModel):
-    """Request model for feature plan review."""
+def _normalize_issue(item: dict[str, Any] | str) -> CodeIssue:
+    """
+    Normalize an issue item to CodeIssue model.
 
-    feature_plan: str = Field(description="Feature plan document")
-    context: str | None = Field(default="", description="Project context")
-    focus_areas: str | None = Field(
-        default="completeness,feasibility,clarity",
-        description="Areas to focus on"
+    Args:
+        item: Issue as dict or string
+
+    Returns:
+        Normalized CodeIssue instance
+    """
+    if isinstance(item, str):
+        return CodeIssue(message=item)
+    return CodeIssue(
+        line=item.get("line"),
+        severity=item.get("severity"),
+        message=item.get("message", item.get("issue", str(item)))
     )
 
 
-class BugAnalysisRequest(BaseModel):
-    """Request model for bug analysis."""
+def _normalize_suggestion(item: dict[str, Any] | str) -> CodeSuggestion:
+    """
+    Normalize a suggestion item to CodeSuggestion model.
 
-    bug_description: str = Field(description="Description of the bug")
-    code_context: str | None = Field(default="", description="Relevant code snippets")
-    error_logs: str | None = Field(default="", description="Error messages and logs")
-    environment: str | None = Field(default="", description="Environment details")
-    reproduction_steps: str | None = Field(default="", description="Steps to reproduce")
-    language: str | None = Field(default="", description="Programming language")
+    Args:
+        item: Suggestion as dict or string
 
-
-class CodeExplanationRequest(BaseModel):
-    """Request model for code explanation."""
-
-    code: str = Field(description="Code to explain")
-    language: str | None = Field(default=None, description="Programming language")
-    detail_level: str | None = Field(
-        default="intermediate",
-        description="Detail level: basic, intermediate, or advanced"
+    Returns:
+        Normalized CodeSuggestion instance
+    """
+    if isinstance(item, str):
+        return CodeSuggestion(suggestion=item)
+    return CodeSuggestion(
+        line=item.get("line"),
+        suggestion=item.get("suggestion", item.get("text", str(item)))
     )
-    questions: str | None = Field(default="", description="Specific questions about the code")
 
 
 def create_server() -> FastMCP:
@@ -103,17 +110,20 @@ def create_server() -> FastMCP:
 
     @mcp.tool()
     async def gemini_review_code(
-        request: CodeReviewRequest,
-        ctx: Context
+        code: str,
+        ctx: Context,
+        language: str | None = None,
+        focus: str | None = "general",
     ) -> CodeReviewResponse:
         """
         Analyze code quality, style, and potential issues using Gemini.
         
-        Provides comprehensive code review including bug detection,
-        security analysis, performance optimization suggestions, and
-        best practice recommendations.
+        Args:
+            code: Code to review
+            language: Programming language
+            focus: Focus area: general, security, performance, style, or bugs
         """
-        await ctx.info(f"Starting code review for {len(request.code)} characters of code")
+        await ctx.info(f"Starting code review for {len(code)} characters of code")
 
         try:
             # Get template and format prompt
@@ -122,7 +132,7 @@ def create_server() -> FastMCP:
                 raise ValueError("Code review template not found")
 
             # Determine language if not provided
-            language = request.language or "auto-detect"
+            lang = language or "auto-detect"
 
             # Create focus instruction
             focus_map = {
@@ -132,12 +142,12 @@ def create_server() -> FastMCP:
                 "bugs": "Focus on potential bugs and logical errors.",
                 "general": "Provide a comprehensive review covering all aspects."
             }
-            focus_instruction = focus_map.get(request.focus, focus_map["general"])
+            focus_instruction = focus_map.get(focus, focus_map["general"])
 
             # Format template
             system_prompt, user_prompt = template.format(
-                language=language,
-                code=request.code,
+                language=lang,
+                code=code,
                 focus_instruction=focus_instruction
             )
 
@@ -172,10 +182,17 @@ def create_server() -> FastMCP:
                         "suggestions": content.split('\n') if content else []
                     }
 
+                # Normalize issues and suggestions to proper models
+                raw_issues = parsed.get("issues", [])
+                raw_suggestions = parsed.get("suggestions", [])
+
+                normalized_issues = [_normalize_issue(i) for i in raw_issues]
+                normalized_suggestions = [_normalize_suggestion(s) for s in raw_suggestions if s]
+
                 return CodeReviewResponse(
                     summary=parsed.get("summary", "Code review completed"),
-                    issues=parsed.get("issues", []),
-                    suggestions=parsed.get("suggestions", []),
+                    issues=normalized_issues,
+                    suggestions=normalized_suggestions,
                     rating=parsed.get("rating", "Review completed"),
                     input_prompt=response.input_prompt,
                     gemini_response=response.content
@@ -186,7 +203,7 @@ def create_server() -> FastMCP:
                 return CodeReviewResponse(
                     summary=response.content[:200] + "..." if len(response.content) > 200 else response.content,
                     issues=[],
-                    suggestions=[response.content],
+                    suggestions=[CodeSuggestion(suggestion=response.content)],
                     rating="Review completed (text format)",
                     input_prompt=response.input_prompt,
                     gemini_response=response.content
@@ -205,14 +222,18 @@ def create_server() -> FastMCP:
 
     @mcp.tool()
     async def gemini_proofread_feature_plan(
-        request: FeaturePlanRequest,
-        ctx: Context
+        feature_plan: str,
+        ctx: Context,
+        context: str | None = "",
+        focus_areas: str | None = "completeness,feasibility,clarity",
     ) -> GeminiToolResponse:
         """
         Review and improve feature plans and specifications using Gemini.
         
-        Analyzes feature plans for completeness, clarity, technical feasibility,
-        and provides suggestions for improvement.
+        Args:
+            feature_plan: Feature plan document
+            context: Project context
+            focus_areas: Areas to focus on
         """
         await ctx.info("Starting feature plan review")
 
@@ -224,9 +245,9 @@ def create_server() -> FastMCP:
 
             # Format template
             system_prompt, user_prompt = template.format(
-                feature_plan=request.feature_plan,
-                context=request.context,
-                focus_areas=request.focus_areas
+                feature_plan=feature_plan,
+                context=context,
+                focus_areas=focus_areas
             )
 
             # Call Gemini
@@ -254,14 +275,24 @@ def create_server() -> FastMCP:
 
     @mcp.tool()
     async def gemini_analyze_bug(
-        request: BugAnalysisRequest,
-        ctx: Context
+        bug_description: str,
+        ctx: Context,
+        code_context: str | None = "",
+        error_logs: str | None = "",
+        environment: str | None = "",
+        reproduction_steps: str | None = "",
+        language: str | None = "",
     ) -> GeminiToolResponse:
         """
         Analyze bugs and suggest fixes using Gemini.
         
-        Provides root cause analysis, fix suggestions, and preventive measures
-        for reported bugs.
+        Args:
+            bug_description: Description of the bug
+            code_context: Relevant code snippets
+            error_logs: Error messages and logs
+            environment: Environment details
+            reproduction_steps: Steps to reproduce
+            language: Programming language
         """
         await ctx.info("Starting bug analysis")
 
@@ -273,12 +304,12 @@ def create_server() -> FastMCP:
 
             # Format template
             system_prompt, user_prompt = template.format(
-                bug_description=request.bug_description,
-                error_logs=request.error_logs,
-                code_context=request.code_context,
-                language=request.language or "unknown",
-                environment=request.environment,
-                reproduction_steps=request.reproduction_steps
+                bug_description=bug_description,
+                error_logs=error_logs,
+                code_context=code_context,
+                language=language or "unknown",
+                environment=environment,
+                reproduction_steps=reproduction_steps
             )
 
             # Call Gemini
@@ -306,16 +337,22 @@ def create_server() -> FastMCP:
 
     @mcp.tool()
     async def gemini_explain_code(
-        request: CodeExplanationRequest,
-        ctx: Context
+        code: str,
+        ctx: Context,
+        language: str | None = None,
+        detail_level: str | None = "intermediate",
+        questions: str | None = "",
     ) -> GeminiToolResponse:
         """
         Explain code functionality and implementation using Gemini.
         
-        Provides clear, educational explanations of code with varying
-        levels of detail based on the target audience.
+        Args:
+            code: Code to explain
+            language: Programming language
+            detail_level: Detail level: basic, intermediate, or advanced
+            questions: Specific questions about the code
         """
-        await ctx.info(f"Starting code explanation ({request.detail_level} level)")
+        await ctx.info(f"Starting code explanation ({detail_level} level)")
 
         try:
             # Get template
@@ -324,14 +361,14 @@ def create_server() -> FastMCP:
                 raise ValueError("Code explanation template not found")
 
             # Determine language if not provided
-            language = request.language or "auto-detect"
+            lang = language or "auto-detect"
 
             # Format template
             system_prompt, user_prompt = template.format(
-                language=language,
-                code=request.code,
-                detail_level=request.detail_level,
-                questions=request.questions
+                language=lang,
+                code=code,
+                detail_level=detail_level,
+                questions=questions
             )
 
             # Call Gemini

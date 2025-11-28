@@ -6,6 +6,7 @@ calls and authentication through gcloud.
 """
 
 import asyncio
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -17,7 +18,11 @@ from pydantic import BaseModel, Field
 class GeminiOptions(BaseModel):
     """Configuration options for Gemini CLI calls."""
 
-    model: str = Field(default="gemini-2.5-pro", description="Gemini model to use")
+    model: str = Field(default="gemini-3-pro-preview", description="Gemini model to use")
+    fallback_models: list[str] = Field(
+        default_factory=lambda: ["gemini-2.5-pro"],
+        description="Models to try if primary fails"
+    )
     sandbox: bool = Field(default=False, description="Run in sandbox mode")
     debug: bool = Field(default=False, description="Enable debug mode")
     all_files: bool = Field(default=False, description="Include all files in context")
@@ -65,23 +70,17 @@ class GeminiCLIClient:
     async def verify_authentication(self) -> bool:
         """
         Verify that Gemini CLI is available and authenticated.
-        
+
         Returns:
             True if authentication is valid, False otherwise
-            
+
         Raises:
             GeminiCLIError: If CLI is not available or authentication fails
         """
         try:
-            # Check if gemini CLI is available
-            result = await asyncio.create_subprocess_exec(
-                "which", "gemini",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            await result.wait()
-
-            if result.returncode != 0:
+            # Check if gemini CLI is available (cross-platform)
+            gemini_path = shutil.which("gemini")
+            if not gemini_path:
                 raise GeminiCLIError("Gemini CLI not found. Please install and configure Gemini CLI.")
 
             # Test basic authentication with a simple prompt
@@ -106,7 +105,7 @@ class GeminiCLIClient:
         input_files: list[str | Path] | None = None
     ) -> GeminiResponse:
         """
-        Make a call to Gemini CLI with the given prompt.
+        Make a call to Gemini CLI with the given prompt, with fallback support.
         
         Args:
             prompt: The prompt to send to Gemini
@@ -117,12 +116,45 @@ class GeminiCLIClient:
             GeminiResponse with the result
             
         Raises:
-            GeminiCLIError: If the CLI call fails
+            GeminiCLIError: If the CLI call fails and no fallbacks succeed
         """
         if not self._verified_auth:
             await self.verify_authentication()
 
-        return await self._call_gemini(prompt, options, input_files)
+        # Use provided options or defaults
+        opts = options or self.default_options
+        
+        # Create a copy to modify during fallback attempts
+        current_opts = opts.model_copy()
+        
+        # List of models to try: primary + fallbacks
+        models_to_try = [current_opts.model] + current_opts.fallback_models
+        
+        last_response = None
+        
+        for model in models_to_try:
+            current_opts.model = model
+            
+            # Log retry if this isn't the first attempt
+            if last_response:
+                # We could log here if we had a logger, but for now just proceed
+                pass
+                
+            response = await self._call_gemini(prompt, current_opts, input_files)
+            
+            if response.success:
+                return response
+            
+            last_response = response
+            
+        # If we get here, all models failed
+        # Return the last response (usually from the fallback model)
+        return last_response or GeminiResponse(
+            content="",
+            success=False,
+            error="No models defined to try",
+            input_prompt=prompt
+        )
 
     async def _call_gemini(
         self,
@@ -167,6 +199,7 @@ class GeminiCLIClient:
         # Add prompt using -p flag
         cmd.extend(["-p", prompt])
 
+        temp_file_path = None
         try:
             # Handle input files if provided
             if input_files:
@@ -192,9 +225,6 @@ class GeminiCLIClient:
                         stdout=asyncio.subprocess.PIPE,
                         stderr=asyncio.subprocess.PIPE
                     )
-
-                # Clean up temp file
-                Path(temp_file_path).unlink()
             else:
                 # No input files, call directly
                 process = await asyncio.create_subprocess_exec(
@@ -242,6 +272,13 @@ class GeminiCLIClient:
                 input_prompt=prompt,
                 metadata={"command": " ".join(cmd)}
             )
+        finally:
+            # Clean up temp file if it was created
+            if temp_file_path:
+                try:
+                    Path(temp_file_path).unlink(missing_ok=True)
+                except OSError:
+                    pass  # Ignore cleanup errors
 
     async def call_with_structured_prompt(
         self,

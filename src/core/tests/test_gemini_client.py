@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from ..gemini_client import (
+from src.core.gemini_client import (
     GeminiCLIClient,
     GeminiCLIError,
     GeminiOptions,
@@ -20,7 +20,7 @@ class TestGeminiOptions:
     def test_default_values(self):
         """Test default option values."""
         options = GeminiOptions()
-        assert options.model == "gemini-2.5-pro"
+        assert options.model == "gemini-3-pro-preview"
         assert options.sandbox is False
         assert options.debug is False
         assert options.all_files is False
@@ -44,18 +44,21 @@ class TestGeminiResponse:
         """Test successful response."""
         response = GeminiResponse(
             content="Test response",
-            success=True
+            success=True,
+            input_prompt="Test prompt"
         )
         assert response.content == "Test response"
         assert response.success is True
         assert response.error is None
+        assert response.input_prompt == "Test prompt"
 
     def test_error_response(self):
         """Test error response."""
         response = GeminiResponse(
             content="",
             success=False,
-            error="Test error"
+            error="Test error",
+            input_prompt="Test prompt"
         )
         assert response.content == ""
         assert response.success is False
@@ -68,7 +71,7 @@ class TestGeminiCLIClient:
     def test_initialization(self):
         """Test client initialization."""
         client = GeminiCLIClient()
-        assert client.default_options.model == "gemini-2.5-pro"
+        assert client.default_options.model == "gemini-3-pro-preview"
         assert not client._verified_auth
 
     def test_initialization_with_options(self):
@@ -83,13 +86,8 @@ class TestGeminiCLIClient:
         """Test authentication verification when CLI is not found."""
         client = GeminiCLIClient()
 
-        with patch('asyncio.create_subprocess_exec') as mock_subprocess:
-            # Mock subprocess that returns non-zero (CLI not found)
-            mock_process = AsyncMock()
-            mock_process.wait.return_value = None
-            mock_process.returncode = 1
-            mock_subprocess.return_value = mock_process
-
+        with patch('shutil.which', return_value=None):
+            # shutil.which returns None when CLI is not found
             with pytest.raises(GeminiCLIError, match="Gemini CLI not found"):
                 await client.verify_authentication()
 
@@ -109,7 +107,8 @@ class TestGeminiCLIClient:
                 # Mock successful Gemini call
                 mock_call.return_value = GeminiResponse(
                     content="Hello response",
-                    success=True
+                    success=True,
+                    input_prompt="Hello"
                 )
 
                 result = await client.verify_authentication()
@@ -154,10 +153,10 @@ class TestGeminiCLIClient:
             # Verify command was called with correct arguments
             call_args = mock_subprocess.call_args[0]
             assert "gemini" in call_args
-            assert "--model" in call_args
+            assert "-m" in call_args
             assert "gemini-pro" in call_args
-            assert "--sandbox" in call_args
-            assert "--debug" in call_args
+            assert "-s" in call_args  # sandbox flag
+            assert "-d" in call_args  # debug flag
 
             assert response.success is True
 
@@ -187,7 +186,8 @@ class TestGeminiCLIClient:
         with patch.object(client, 'call_gemini') as mock_call:
             mock_call.return_value = GeminiResponse(
                 content="Structured response",
-                success=True
+                success=True,
+                input_prompt="System: System instructions\n\nContext:\nContext info\n\nUser: User request"
             )
 
             response = await client.call_with_structured_prompt(

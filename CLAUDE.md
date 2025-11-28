@@ -2,276 +2,138 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Core Principles
+## Project Overview
 
-KISS (Keep It Simple, Stupid): Simplicity should be a key goal in design. Choose straightforward solutions over complex ones whenever possible. Simple solutions are easier to understand, maintain, and debug.
+**Gemini Code Assist MCP** - A Model Context Protocol server that integrates Google Gemini CLI with Claude Code for AI-powered development assistance. Uses existing Google Cloud authentication (no API key needed).
 
-YAGNI (You Aren't Gonna Need It): Avoid building functionality on speculation. Implement features only when they are needed, not when you anticipate they might be useful in the future.
+**Prerequisites**:
+- Python 3.11+
+- Gemini CLI installed: `npm install -g @google/gemini-cli`
+- Google authentication: `gcloud auth login`
 
-Dependency Inversion: High-level modules should not depend on low-level modules. Both should depend on abstractions. This principle enables flexibility and testability.
+## Development Commands
 
-Open/Closed Principle: Software entities should be open for extension but closed for modification. Design your systems so that new functionality can be added with minimal changes to existing code.
+```bash
+# Setup
+uv venv && uv sync
 
-## 🧱 Code Structure & Modularity
+# Run tests
+uv run pytest                           # All tests
+uv run pytest src/core/tests/ -v        # Specific module
+uv run pytest --cov=src --cov-report=html  # With coverage
 
-- **Never create a file longer than 500 lines of code.** If a file approaches this limit, refactor by splitting it into modules or helper files.
-- **Functions should be short and focused sub 50 lines of code** and have a single responsibility.
-- **Classes should be short and focused sub 50 lines of code** and have a single responsibility.
-- **Organize code into clearly separated modules**, grouped by feature or responsibility.
+# Code quality
+uv run ruff format .                    # Format
+uv run ruff check .                     # Lint
+uv run mypy .                           # Type check
+
+# Run server
+uv run python src/main.py               # Start MCP server
+uv run mcp dev src/main.py              # Development mode with MCP Inspector
+
+# CLI testing
+uv run gemini-mcp-cli status check
+uv run gemini-mcp-cli --show-prompts review file --file code.py
+
+# Package management
+uv add <package>                        # Add dependency
+uv remove <package>                     # Remove dependency
+```
 
 ## Architecture
 
-Strict vertical slice architecture with tests that live next to the code they test.
+Vertical slice architecture with tests co-located with code:
 
-src/project/
-**init**.py
-main.py
-tests/test_main.py
-conftest.py
-module_one/ (eg. database, core, auth)
-**init**.py
-module_one.py
-tests/
-test_module_one.py
-module_two/ (eg. api, ui, cli)
-**init**.py
-module_two.py
-tests/
-test_module_two.py
-
-    features/ (eg. business logic, tools, etc.)
-        feature_one/
-            __init__.py
-            feature.py
-            tests/
-                test_feature.py
-
-Features can also be part of moduels if the module for example is a api integration or a cli tool.
-
-eg
-src/project/
-module_one/ (api integration with crm service)
-**init**.py
-module_one.py
-tests/
-test_module_one.py
-features/
-feature_one/ (CRM service integration slice)
-**init**.py
-feature.py
-tests/
-test_feature.py
-
-## Testing
-
-**Always create Pytest unit tests for new features**
-(functions, classes, routes, etc)
-Tests are always created in the same directory as the code they test in a tests/ directory. Create the tests directory if it doesn't exist.
-
-**After updating any logic**, check whether existing unit tests need to be updated. If so, do it following the implementation.
-
-Always test individual functions and classes.
-
-## Style & Conventions
-
-### 📎 Style & Conventions
-
-- **Use Python** as the primary language.
-- **Follow PEP8**, always use type hints, and format with `ruff`.
-- **Use `pydanticv2` for data validation**.
-- **ALWAYS use classes, data types, data models, for typesafety and verifiability**
-- **ALWAYS use docstrings for every function** using the Google style:
-
-  ```python
-  def example():
-      """
-      Brief summary.
-
-      Args:
-          param1 (type): Description.
-
-      Returns:
-          type: Description.
-
-      Raises:
-          Exception: Description.
-      """
-  ```
-
-## 🛠️ Environment Setup
-
-```bash
-# Create and activate virtual environment with uv
-uv venv
-source .venv/bin/activate  # On Unix/macOS
-# .venv\Scripts\activate  # On Windows
-
-# Install dependencies
-uv sync
-
-# Install package in development mode
-uv pip install -e .
+```
+src/
+├── main.py                    # Entry point, exposes FastMCP server as `mcp`/`server`/`app`
+├── server/
+│   └── gemini_server.py       # FastMCP server with tools: gemini_review_code,
+│                              # gemini_proofread_feature_plan, gemini_analyze_bug,
+│                              # gemini_explain_code + MCP resources
+├── core/
+│   ├── gemini_client.py       # GeminiCLIClient wrapper (subprocess to Gemini CLI)
+│   ├── config.py              # ServerConfig, PromptTemplate, ConfigManager
+│   └── tests/
+├── cli/
+│   ├── main.py                # Click CLI entry point
+│   ├── commands/              # review, feature, bug, explain, status commands
+│   └── utils/                 # OutputFormatter, file utilities
+└── features/                  # Feature modules (analysis, proofreading, utilities)
 ```
 
-## 🛠️ Development Commands
+### Key Data Flow
 
-```bash
-# Run all tests
-uv run pytest
+1. MCP tools in `gemini_server.py` receive requests
+2. Tools use `ConfigManager` to get prompt templates
+3. `GeminiCLIClient.call_with_structured_prompt()` builds and executes CLI commands
+4. Gemini CLI runs via `asyncio.subprocess`, authenticates via gcloud
+5. Response parsed and returned as Pydantic models
 
-# Run specific tests
-uv run pytest src/core/tests/ -v
+## Code Guidelines
 
-# Run tests with coverage
-python run_tests.py --coverage
+- **File limits**: <500 lines per file, <50 lines per function/class
+- **Style**: PEP8, type hints required, format with `ruff`
+- **Validation**: Use Pydantic v2 models for all data structures
+- **Docstrings**: Google style for all functions
+- **Tests**: Co-located in `tests/` directories, always test new features
+- **Comments**: Add `# Reason:` for non-obvious logic
 
-# Format code
-uv run ruff format .
-
-# Run linter
-uv run ruff check .
-
-# Run type checker
-uv run mypy .
-
-# Start MCP server for development
-uv run python src/main.py
-
-# Install MCP server in Claude Code
-uv run mcp install src/main.py --name "Gemini Assistant"
-```
-
-## 🛠️ UV Package Management
-
-This project uses UV for Python package management. Key commands include:
-
-```bash
-# Create virtual environment
-uv venv
-
-# Install dependencies from pyproject.toml
-uv sync
-
-# Install a specific package
-uv add requests
-
-# Remove a package
-uv remove requests
-
-# Run a Python script or command
-uv run python script.py
-uv run pytest
-
-# Install editable packages
-uv pip install -e .
-```
-
-When running scripts or tools, always use `uv run` to ensure proper virtual environment activation:
-
-```bash
-# Preferred way to run commands
-uv run pytest
-uv run black .
-
-# Running tools without installing
-uvx black .
-uvx ruff check .
-```
-
-## 🛠️ BRANCHING STRATEGY
-
-This repository follows a develop → main branching strategy, where:
-
-- `main` is the production branch containing stable releases
-- `develop` is the integration branch where features are merged
-- Feature branches are created from `develop` for work in progress
-
-When creating branches, follow these naming conventions:
-
-- Feature branches: `feature/descriptive-name`
-- Bug fix branches: `fix/issue-description`
-- Documentation branches: `docs/what-is-changing`
-- Refactoring branches: `refactor/what-is-changing`
-
-## Behavioural Guidelines
-
-- Always use `uv` for package management.
-- Always use `ruff` for linting.
-
-- **_ NEVER ASSUME OR GUESS _**
-- When in doubt, ask for clarification or ask for help. more often than not youcan do websearch to find relevant examples of check ai_docs/ for examples that the user have added.
-
-- **Always confirm file paths & module names** exist before using them.
-
-- **Comment non-obvious code** and ensure everything is understandable to a mid-level developer.
-- When writing complex logic, **add an inline `# Reason:` comment** explaining the why, not just the what.
-
-- **KEEP README.md UPDATED**
-- Whenever you make changes to the codebase, update the README.md file to reflect the changes. Espeially if you add configuration changes or new features.
-
-- **ALWAYS keep CLAUDE.md UPDATED**
-- Add new dependencies to CLAUDE.md
-- Add important types and patterns to CLAUDE.md
-
-## IMPORTANT TYPES & PATTERNS
-
-### Project Dependencies
-
-- **mcp >= 1.0.0**: Model Context Protocol Python SDK
-- **pydantic >= 2.0.0**: Data validation and settings management
-- **typing-extensions**: Extended typing support
-- **asyncio.subprocess**: Built-in async subprocess handling for Gemini CLI
-
-### Key Types
+## Key Types & Patterns
 
 ```python
-# Core Gemini client types
+# Gemini client
 from src.core.gemini_client import GeminiOptions, GeminiResponse, GeminiCLIClient
 
-# Configuration types
+# Configuration
 from src.core.config import ServerConfig, PromptTemplate, ConfigManager
 
-# Request/Response models for MCP tools
-from src.server.gemini_server import (
-    CodeReviewRequest, CodeReviewResponse,
-    FeaturePlanRequest, BugAnalysisRequest,
-    CodeExplanationRequest
-)
+# MCP responses
+from src.server.gemini_server import CodeReviewResponse, GeminiToolResponse
 ```
 
 ### MCP Tool Pattern
 
-All MCP tools follow this pattern:
 ```python
 @mcp.tool()
-async def tool_name(request: RequestModel, ctx: Context) -> ResponseModel:
-    """Tool description for MCP."""
+async def tool_name(
+    required_arg: str,
+    ctx: Context,
+    optional_arg: str | None = "default",
+) -> GeminiToolResponse:
+    """Tool description."""
     await ctx.info("Starting operation")
     try:
-        # Tool implementation
-        result = await some_operation()
-        return result
+        template = config_manager.get_template("template_name")
+        system_prompt, user_prompt = template.format(**kwargs)
+        response = await gemini_client.call_with_structured_prompt(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt
+        )
+        return GeminiToolResponse(result=response.content, ...)
     except Exception as e:
         await ctx.error(f"Error: {str(e)}")
         return error_response
 ```
 
-### Gemini CLI Integration
+### Adding New Tools
 
-```python
-# Standard pattern for calling Gemini
-client = GeminiCLIClient(options)
-await client.verify_authentication()
-response = await client.call_with_structured_prompt(
-    system_prompt="Instructions",
-    user_prompt="Request", 
-    context="Additional context"
-)
-```
+1. Add `PromptTemplate` in `ConfigManager._load_default_templates()` (`src/core/config.py`)
+2. Add tool function with `@mcp.tool()` decorator in `create_server()` (`src/server/gemini_server.py`)
+3. Add CLI command in `src/cli/commands/`
+4. Add tests in corresponding `tests/` directories
 
-### Project Structure
+## Dependencies
 
-This is a **Gemini MCP Server** - a Model Context Protocol server that integrates Google Gemini CLI for AI-powered development assistance in Claude Code.
+- **mcp >= 1.0.0**: Model Context Protocol SDK (FastMCP)
+- **pydantic >= 2.0.0**: Data validation
+- **click >= 8.0.0**: CLI framework
+- **rich >= 12.0.0**: Terminal formatting
 
-**Prerequisites**: Gemini CLI installed and authenticated via `gcloud auth login` (no API key needed).
+## Behavioral Guidelines
+
+- Always use `uv run` for commands
+- Always confirm file paths exist before using them
+- Keep README.md and CLAUDE.md updated with changes
+- Branch naming: `feature/`, `fix/`, `docs/`, `refactor/`
 
